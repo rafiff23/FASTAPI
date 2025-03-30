@@ -295,6 +295,16 @@ def get_latest_status_full(driver_id: int):
         return dict(zip(keys, result))
     finally:
         db.close()
+        
+@app.get("/debug-users")
+def debug_users():
+    db = SessionLocal()
+    try:
+        result = db.execute(text("SELECT id, name, password FROM users")).fetchall()
+        return [{"id": r[0], "name": r[1], "password": r[2]} for r in result]
+    finally:
+        db.close()
+
 
 @app.post("/status-driver-update")
 def update_status_driver(
