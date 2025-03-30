@@ -6,4 +6,4 @@ services:
     startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: DB_URL
-        value: postgresql://postgres:110102Jan!@db.voehxdnuekfdycyrkfmu.supabase.co:5432/postgres
+        value: postgresql://postgres.voehxdnuekfdycyrkfmu:110102Januari!@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true
