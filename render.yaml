@@ -3,7 +3,7 @@ services:
     name: mahligai-backend
     env: python
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn main:app --host 0.0.0.0 --port 10000"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: DB_URL
         value: postgresql://postgres:110102Jan!@db.voehxdnuekfdycyrkfmu.supabase.co:5432/postgres
