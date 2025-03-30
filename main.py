@@ -302,8 +302,12 @@ def debug_users():
     try:
         result = db.execute(text("SELECT id, name, password FROM users")).fetchall()
         return [{"id": r[0], "name": r[1], "password": r[2]} for r in result]
+    except Exception as e:
+        print("❌ DB Error:", str(e))  # <--- CETAK ERROR SEBENARNYA
+        raise HTTPException(status_code=500, detail=str(e))  # <--- tampilkan error aslinya ke browser
     finally:
         db.close()
+
 
 
 @app.post("/status-driver-update")
