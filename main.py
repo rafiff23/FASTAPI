@@ -9,10 +9,16 @@ import os
 import shutil
 from typing import Optional
 
+# Load .env
+load_dotenv()
+
+DB_URL = os.getenv("DB_URL")
+engine = create_engine(DB_URL)
+SessionLocal = sessionmaker(bind=engine)
 
 app = FastAPI()
 
-# CORS
+# CORS settings
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,16 +26,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database lokal (jangan diubah)
-DB_URL = "postgresql://postgres:123@localhost:5432/Mahligai"
-engine = create_engine(DB_URL)
-SessionLocal = sessionmaker(bind=engine)
-
-# Folder untuk simpan file foto
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# ========= LOGIN ==========
+# ========== LOGIN ==========
 @app.post("/login")
 def login(data: dict):
     db = SessionLocal()
@@ -46,7 +46,7 @@ def login(data: dict):
     finally:
         db.close()
 
-# ========= TRACKING ==========
+# ========== TRACKING ==========
 class TrackingData(BaseModel):
     driver_id: int
     latitude: float
@@ -75,7 +75,7 @@ def track(data: TrackingData):
     finally:
         db.close()
 
-# ========= STATUS DRIVER (Tanpa Foto) ==========
+# ========== STATUS DRIVER ==========
 class StatusDriverData(BaseModel):
     driver_id: int
     perusahaan_id: int
@@ -122,7 +122,6 @@ def create_status_driver(data: StatusDriverData):
     finally:
         db.close()
 
-# ========= STATUS DRIVER + FILE FOTO ==========
 @app.post("/status-driver-upload")
 async def create_status_driver_upload(
     driver_id: int = Form(...),
@@ -195,7 +194,7 @@ async def create_status_driver_upload(
     finally:
         db.close()
 
-# ========= CEK STATUS ==========
+# ========== CEK STATUS ==========
 @app.get("/status-driver/latest")
 def get_latest_status(driver_id: int):
     db = SessionLocal()
@@ -209,7 +208,6 @@ def get_latest_status(driver_id: int):
             """),
             {"driver_id": driver_id}
         ).fetchone()
-
         return {"status_id": result[0] if result else None}
     finally:
         db.close()
@@ -229,7 +227,7 @@ def check_driver_active(driver_id: int):
     finally:
         db.close()
 
-# ========= DROPDOWNS ==========
+# ========== DROPDOWNS ==========
 @app.get("/ekspor-impor")
 def get_ekspor_impor():
     db = SessionLocal()
@@ -270,7 +268,6 @@ def get_status(id: int = Query(...)):
         return [{"id": r[0], "status": r[1]} for r in rows]
     finally:
         db.close()
-
 
 @app.get("/status-driver/latest-full")
 def get_latest_status_full(driver_id: int):
@@ -341,3 +338,9 @@ def update_status_driver(
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
+
+# ========== RUN SERVER ==========
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
