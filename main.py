@@ -210,7 +210,7 @@ def get_latest_status(driver_id: int):
             """),
             {"driver_id": driver_id}
         ).fetchone()
-        return {"status_id": result[0] if result else None
+        return {"status_id": result[0] if result else None,
                 "status_name": result[1] if result else None}
     finally:
         db.close()
