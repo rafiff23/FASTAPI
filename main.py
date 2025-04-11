@@ -201,14 +201,17 @@ def get_latest_status(driver_id: int):
     try:
         result = db.execute(
             text("""
-                SELECT status_id FROM status_driver
-                WHERE driver_id = :driver_id
-                ORDER BY date DESC, time DESC
+                SELECT sd.status_id, sp.status
+                FROM status_driver sd
+                JOIN status_perjalanan sp ON sd.status_id = sp.id
+                WHERE sd.driver_id = :driver_id
+                ORDER BY sd.date DESC, sd.time DESC
                 LIMIT 1
             """),
             {"driver_id": driver_id}
         ).fetchone()
-        return {"status_id": result[0] if result else None}
+        return {"status_id": result[0] if result else None
+                "status_name": result[1] if result else None}
     finally:
         db.close()
 
