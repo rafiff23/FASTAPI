@@ -8,6 +8,7 @@ from datetime import datetime
 import os
 import shutil
 from typing import Optional
+import pytz
 
 # === Load Environment ===
 load_dotenv()
@@ -108,8 +109,8 @@ def create_status_driver(data: StatusDriverData):
                 "driver_id": data.driver_id,
                 "perusahaan_id": data.perusahaan_id,
                 "location": data.location,
-                "date": datetime.now().date(),
-                "time": datetime.now().time(),
+                "date": datetime.now(JAKARTA).date(),
+                "time": datetime.now(JAKARTA).time(),
                 "ukuran_container_id": data.ukuran_container_id,
                 "ekspor_impor_id": data.ekspor_impor_id,
                 "status_id": data.status_id,
@@ -175,8 +176,8 @@ async def create_status_driver_upload(
                 "driver_id": driver_id,
                 "perusahaan_id": perusahaan_id,
                 "location": location,
-                "date": datetime.now().date(),
-                "time": datetime.now().time(),
+                "date": datetime.now(JAKARTA).date(),
+                "time": datetime.now(JAKARTA).time(),
                 "ukuran_container_id": ukuran_container_id,
                 "ekspor_impor_id": ekspor_impor_id,
                 "status_id": status_id,
@@ -327,8 +328,8 @@ def update_status_driver(
                 "driver_id": driver_id,
                 "status_id": status_id,
                 "location": location,
-                "date": datetime.now().date(),
-                "time": datetime.now().time(),
+                "date": datetime.now(JAKARTA).date(),
+                "time": datetime.now(JAKARTA).time(),
                 "menunggu_surat_jalan": menunggu_surat_jalan,
             }
         )
