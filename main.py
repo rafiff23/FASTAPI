@@ -298,34 +298,6 @@ def get_latest_status_full(driver_id: int):
         return dict(zip(keys, result))
     finally:
         db.close()
-
-@app.get("/status-driver/history")
-def get_status_history(driver_id: int):
-    db = SessionLocal()
-    try:
-        result = db.execute(
-            text("""
-                SELECT sd.date, p.nama_perusahaan, sp.status
-                FROM status_driver sd
-                JOIN perusahaan p ON sd.perusahaan_id = p.id
-                JOIN status_perjalanan sp ON sd.status_id = sp.id
-                WHERE sd.driver_id = :driver_id
-                ORDER BY sd.date DESC, sd.time DESC
-            """),
-            {"driver_id": driver_id}
-        ).fetchall()
-
-        return [
-            {
-                "tanggal": row[0].strftime("%Y-%m-%d"),
-                "nama_perusahaan": row[1],
-                "status": row[2]
-            }
-            for row in result
-        ]
-    finally:
-        db.close()
-
         
 @app.get("/debug-users")
 def debug_users():
@@ -338,8 +310,6 @@ def debug_users():
         raise HTTPException(status_code=500, detail=str(e))  # <--- tampilkan error aslinya ke browser
     finally:
         db.close()
-
-
 
 @app.post("/status-driver-update")
 def update_status_driver(
