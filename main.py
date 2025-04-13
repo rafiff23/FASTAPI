@@ -9,16 +9,16 @@ import os
 import shutil
 from typing import Optional
 
-# Load .env
+# === Load Environment ===
 load_dotenv()
-
 DB_URL = os.getenv("DB_URL")
 engine = create_engine(DB_URL)
 SessionLocal = sessionmaker(bind=engine)
 
+# === FastAPI App ===
 app = FastAPI()
 
-# CORS settings
+# === CORS Middleware ===
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,10 +26,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# === File Upload Folder ===
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# ========== LOGIN ==========
+# === LOGIN ===
 @app.post("/login")
 def login(data: dict):
     db = SessionLocal()
@@ -46,7 +47,7 @@ def login(data: dict):
     finally:
         db.close()
 
-# ========== TRACKING ==========
+# === TRACKING ===
 class TrackingData(BaseModel):
     driver_id: int
     latitude: float
@@ -75,7 +76,7 @@ def track(data: TrackingData):
     finally:
         db.close()
 
-# ========== STATUS DRIVER ==========
+# === STATUS DRIVER: Create ===
 class StatusDriverData(BaseModel):
     driver_id: int
     perusahaan_id: int
@@ -122,6 +123,7 @@ def create_status_driver(data: StatusDriverData):
     finally:
         db.close()
 
+# === STATUS DRIVER: Upload with Files ===
 @app.post("/status-driver-upload")
 async def create_status_driver_upload(
     driver_id: int = Form(...),
@@ -178,12 +180,8 @@ async def create_status_driver_upload(
                 "ukuran_container_id": ukuran_container_id,
                 "ekspor_impor_id": ekspor_impor_id,
                 "status_id": status_id,
-                "menunggu_surat_jalan": menunggu_surat_jalan if menunggu_surat_jalan is not None else False,
-                "fd": fd,
-                "fb": fb,
-                "fk": fk,
-                "fr": fr,
-                "ds": ds
+                "menunggu_surat_jalan": menunggu_surat_jalan if menunggu_surat_jalan else False,
+                "fd": fd, "fb": fb, "fk": fk, "fr": fr, "ds": ds
             }
         )
         db.commit()
@@ -194,7 +192,7 @@ async def create_status_driver_upload(
     finally:
         db.close()
 
-# ========== CEK STATUS ==========
+# === STATUS DRIVER: Latest ===
 @app.get("/status-driver/latest")
 def get_latest_status(driver_id: int):
     db = SessionLocal()
@@ -215,22 +213,35 @@ def get_latest_status(driver_id: int):
     finally:
         db.close()
 
-@app.get("/driver-status-active/{driver_id}")
-def check_driver_active(driver_id: int):
+# === STATUS DRIVER: History ===
+@app.get("/status-driver/history")
+def get_status_history(driver_id: int):
     db = SessionLocal()
     try:
-        result = db.execute(text("""
-            SELECT id FROM status_driver
-            WHERE driver_id = :driver_id AND status_id != (
-                SELECT id FROM status_perjalanan WHERE status ILIKE 'Selesai'
-            )
-            ORDER BY id DESC LIMIT 1
-        """), {"driver_id": driver_id}).fetchone()
-        return result is not None
+        result = db.execute(
+            text("""
+                SELECT sd.date, p.nama_perusahaan, sp.status
+                FROM status_driver sd
+                JOIN perusahaan p ON sd.perusahaan_id = p.id
+                JOIN status_perjalanan sp ON sd.status_id = sp.id
+                WHERE sd.driver_id = :driver_id
+                ORDER BY sd.date DESC, sd.time DESC
+            """),
+            {"driver_id": driver_id}
+        ).fetchall()
+
+        return [
+            {
+                "tanggal": row[0].strftime("%Y-%m-%d"),
+                "nama_perusahaan": row[1],
+                "status": row[2]
+            }
+            for row in result
+        ]
     finally:
         db.close()
 
-# ========== DROPDOWNS ==========
+# === DROPDOWNS ===
 @app.get("/ekspor-impor")
 def get_ekspor_impor():
     db = SessionLocal()
@@ -272,33 +283,7 @@ def get_status(id: int = Query(...)):
     finally:
         db.close()
 
-@app.get("/status-driver/latest-full")
-def get_latest_status_full(driver_id: int):
-    db = SessionLocal()
-    try:
-        result = db.execute(
-            text("""
-                SELECT
-                    driver_id, perusahaan_id, location, date, time,
-                    ukuran_container_id, ekspor_impor_id, status_id,
-                    menunggu_surat_jalan
-                FROM status_driver
-                WHERE driver_id = :driver_id
-                ORDER BY date DESC, time DESC
-                LIMIT 1
-            """),
-            {"driver_id": driver_id}
-        ).fetchone()
-
-        if not result:
-            raise HTTPException(status_code=404, detail="Data tidak ditemukan")
-
-        keys = ["driver_id", "perusahaan_id", "location", "date", "time",
-                "ukuran_container_id", "ekspor_impor_id", "status_id", "menunggu_surat_jalan"]
-        return dict(zip(keys, result))
-    finally:
-        db.close()
-        
+# === DEBUG USERS ===
 @app.get("/debug-users")
 def debug_users():
     db = SessionLocal()
@@ -306,11 +291,11 @@ def debug_users():
         result = db.execute(text("SELECT id, name, password FROM users")).fetchall()
         return [{"id": r[0], "name": r[1], "password": r[2]} for r in result]
     except Exception as e:
-        print("❌ DB Error:", str(e))  # <--- CETAK ERROR SEBENARNYA
-        raise HTTPException(status_code=500, detail=str(e))  # <--- tampilkan error aslinya ke browser
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
 
+# === UPDATE STATUS ===
 @app.post("/status-driver-update")
 def update_status_driver(
     driver_id: int = Form(...),
@@ -354,7 +339,7 @@ def update_status_driver(
     finally:
         db.close()
 
-# ========== RUN SERVER ==========
+# === Run locally ===
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
