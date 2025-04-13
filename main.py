@@ -228,8 +228,7 @@ def get_status_history(driver_id: int):
                     sd.date, 
                     p.nama_perusahaan, 
                     sp.status,
-                    sd.latitude,
-                    sd.longitude
+                    sd.location
                 FROM status_driver sd
                 JOIN perusahaan p ON sd.perusahaan_id = p.id
                 JOIN status_perjalanan sp ON sd.status_id = sp.id
@@ -239,13 +238,20 @@ def get_status_history(driver_id: int):
             {"driver_id": driver_id}
         ).fetchall()
 
+        def parse_location(loc_str):
+            try:
+                lat_str, lng_str = loc_str.split(",")
+                return float(lat_str.strip()), float(lng_str.strip())
+            except:
+                return None, None
+
         return [
             {
                 "tanggal": getattr(row[0], "strftime", lambda fmt: row[0])("%Y-%m-%d"),
                 "nama_perusahaan": row[1],
                 "status": row[2],
-                "latitude": row[3],
-                "longitude": row[4]
+                "latitude": parse_location(row[3])[0],
+                "longitude": parse_location(row[3])[1]
             }
             for row in result
         ]
