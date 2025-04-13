@@ -232,7 +232,6 @@ def get_status_history(driver_id: int):
 
         return [
             {
-                "tanggal": row[0].strftime("%Y-%m-%d"),
                 "nama_perusahaan": row[1],
                 "status": row[2]
             }
