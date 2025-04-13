@@ -30,6 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# === File Upload Folder ===
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -93,7 +94,6 @@ class StatusDriverData(BaseModel):
 def create_status_driver(data: StatusDriverData):
     db = SessionLocal()
     try:
-        now = datetime.now(JAKARTA)
         db.execute(
             text("""
                 INSERT INTO status_driver (
@@ -112,8 +112,8 @@ def create_status_driver(data: StatusDriverData):
                 "driver_id": data.driver_id,
                 "perusahaan_id": data.perusahaan_id,
                 "location": data.location,
-                "date": now.date(),
-                "time": now.time().replace(tzinfo=None),
+                "date": datetime.now(JAKARTA).date(),
+                "time": datetime.now(JAKARTA).time().replace(tzinfo=None),
                 "ukuran_container_id": data.ukuran_container_id,
                 "ekspor_impor_id": data.ekspor_impor_id,
                 "status_id": data.status_id,
@@ -153,7 +153,11 @@ async def create_status_driver_upload(
                 return file.filename
             return None
 
-        now = datetime.now(JAKARTA)
+        fd = save_file(foto_depan)
+        fb = save_file(foto_belakang)
+        fk = save_file(foto_kiri)
+        fr = save_file(foto_kanan)
+        ds = save_file(dokumen_seal)
 
         db.execute(
             text("""
@@ -175,23 +179,122 @@ async def create_status_driver_upload(
                 "driver_id": driver_id,
                 "perusahaan_id": perusahaan_id,
                 "location": location,
-                "date": now.date(),
-                "time": now.time().replace(tzinfo=None),
+                "date": datetime.now(JAKARTA).date(),
+                "time": datetime.now(JAKARTA).time().replace(tzinfo=None),
                 "ukuran_container_id": ukuran_container_id,
                 "ekspor_impor_id": ekspor_impor_id,
                 "status_id": status_id,
                 "menunggu_surat_jalan": menunggu_surat_jalan if menunggu_surat_jalan else False,
-                "fd": save_file(foto_depan),
-                "fb": save_file(foto_belakang),
-                "fk": save_file(foto_kiri),
-                "fr": save_file(foto_kanan),
-                "ds": save_file(dokumen_seal)
+                "fd": fd, "fb": fb, "fk": fk, "fr": fr, "ds": ds
             }
         )
         db.commit()
         return {"message": "Status + file created"}
     except Exception as e:
         db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+# === STATUS DRIVER: Latest ===
+@app.get("/status-driver/latest")
+def get_latest_status(driver_id: int):
+    db = SessionLocal()
+    try:
+        result = db.execute(
+            text("""
+                SELECT sd.status_id, sp.status
+                FROM status_driver sd
+                JOIN status_perjalanan sp ON sd.status_id = sp.id
+                WHERE sd.driver_id = :driver_id
+                ORDER BY sd.date DESC, sd.time DESC
+                LIMIT 1
+            """),
+            {"driver_id": driver_id}
+        ).fetchone()
+        return {"status_id": result[0] if result else None,
+                "status_name": result[1] if result else None}
+    finally:
+        db.close()
+
+# === STATUS DRIVER: History ===
+@app.get("/status-driver/history")
+def get_status_history(driver_id: int):
+    db = SessionLocal()
+    try:
+        result = db.execute(
+            text("""
+                SELECT sd.date, p.nama_perusahaan, sp.status
+                FROM status_driver sd
+                JOIN perusahaan p ON sd.perusahaan_id = p.id
+                JOIN status_perjalanan sp ON sd.status_id = sp.id
+                WHERE sd.driver_id = :driver_id
+                ORDER BY sd.date DESC, sd.time DESC
+            """),
+            {"driver_id": driver_id}
+        ).fetchall()
+
+        return [
+            {
+                "tanggal": getattr(row[0], "strftime", lambda fmt: row[0])("%Y-%m-%d"),
+                "nama_perusahaan": row[1],
+                "status": row[2]
+            }
+            for row in result
+        ]
+    finally:
+        db.close()
+
+# === DROPDOWNS ===
+@app.get("/ekspor-impor")
+def get_ekspor_impor():
+    db = SessionLocal()
+    try:
+        rows = db.execute(text("SELECT id, tipe AS nama FROM ekspor_impor_type")).fetchall()
+        return [{"id": r[0], "nama": r[1]} for r in rows]
+    finally:
+        db.close()
+
+@app.get("/ukuran-container")
+def get_ukuran():
+    db = SessionLocal()
+    try:
+        rows = db.execute(text("SELECT id, ukuran FROM ukuran_container")).fetchall()
+        return [{"id": r[0], "ukuran": r[1]} for r in rows]
+    finally:
+        db.close()
+
+@app.get("/perusahaan")
+def get_perusahaan():
+    db = SessionLocal()
+    try:
+        rows = db.execute(text("SELECT id, nama_perusahaan FROM perusahaan")).fetchall()
+        return [{"id": r[0], "nama_perusahaan": r[1]} for r in rows]
+    finally:
+        db.close()
+
+@app.get("/status")
+def get_status(id: int = Query(...)):
+    db = SessionLocal()
+    try:
+        rows = db.execute(text("""
+            SELECT sp.id, sp.status
+            FROM status_mapping sm
+            JOIN status_perjalanan sp ON sm.status_id = sp.id
+            WHERE sm.ekspor_impor_id = :id
+        """), {"id": id}).fetchall()
+        return [{"id": r[0], "status": r[1]} for r in rows]
+    finally:
+        db.close()
+
+# === DEBUG USERS ===
+@app.get("/debug-users")
+def debug_users():
+    db = SessionLocal()
+    try:
+        result = db.execute(text("SELECT id, name, password FROM users")).fetchall()
+        return [{"id": r[0], "name": r[1], "password": r[2]} for r in result]
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
@@ -206,7 +309,6 @@ def update_status_driver(
 ):
     db = SessionLocal()
     try:
-        now = datetime.now(JAKARTA)
         db.execute(
             text("""
                 INSERT INTO status_driver (
@@ -229,8 +331,8 @@ def update_status_driver(
                 "driver_id": driver_id,
                 "status_id": status_id,
                 "location": location,
-                "date": now.date(),
-                "time": now.time().replace(tzinfo=None),
+                "date": datetime.now(JAKARTA).date(),      
+                "time": datetime.now(JAKARTA).time().replace(tzinfo=None),
                 "menunggu_surat_jalan": menunggu_surat_jalan,
             }
         )
@@ -240,3 +342,9 @@ def update_status_driver(
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
+
+# === Run locally ===
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
